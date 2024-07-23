@@ -30,25 +30,18 @@ factura_produs_association = Table(
 )
 
 
-class Furnizor(Base):
-    __tablename__ = "furnizori"
+class Firma(Base):
+    __tablename__ = "firme"
     id = Column(Integer, primary_key=True)
     denumire = Column(String(50), nullable=False)
     cif = Column(String(20), nullable=False)
     adresa = Column(String(100), nullable=False)
-    facturi = relationship("Factura", back_populates="furnizor")
-
-    def __repr__(self):
-        return f"Furnizor(id={self.id}, denumire={self.denumire}, cif={self.cif}, adresa={self.adresa})"
-
-
-class Client(Base):
-    __tablename__ = "clienti"
-    id = Column(Integer, primary_key=True)
-    denumire = Column(String(50), nullable=False)
-    cif = Column(String(20), nullable=False)
-    adresa = Column(String(100), nullable=False)
-    facturi = relationship("Factura", back_populates="client")
+    factura_client = relationship("Factura",
+                                  back_populates="client",
+                                  foreign_keys="Factura.client_id")
+    factura_furnizor = relationship("Factura",
+                                    back_populates="furnizor",
+                                    foreign_keys="Factura.furnizor_id")
 
     def __repr__(self):
         return f"Client(id={self.id}, denumire={self.denumire}, cif={self.cif}, adresa={self.adresa})"
@@ -72,10 +65,14 @@ class Factura(Base):
     __tablename__ = "facturi"
     id = Column(Integer, primary_key=True)
     data_emitere = Column(Date, default=datetime.now())
-    furnizor_id = Column(Integer, ForeignKey("furnizori.id"))
-    client_id = Column(Integer, ForeignKey("clienti.id"))
-    furnizor = relationship("Furnizor", back_populates="facturi")
-    client = relationship("Client", back_populates="facturi")
+    furnizor_id = Column(Integer, ForeignKey("firme.id"))
+    client_id = Column(Integer, ForeignKey("firme.id"))
+    furnizor = relationship("Firma",
+                            foreign_keys=[furnizor_id],
+                            back_populates="factura_furnizor")
+    client = relationship("Firma",
+                          foreign_keys=[client_id],
+                          back_populates="factura_client")
     produse = relationship(
         "Produs", secondary=factura_produs_association, back_populates="facturi"
     )
@@ -126,48 +123,26 @@ session = Session()
 # Metode pentru adaugare, afisare, stergere furnizori, clienti, produse, facturi
 
 
-def adauga_furnizor(denumire, cif, adresa):
-    furnizor = Furnizor(denumire=denumire, cif=cif, adresa=adresa)
-    session.add(furnizor)
+def adauga_firma(denumire, cif, adresa):
+    firma = Firma(denumire=denumire, cif=cif, adresa=adresa)
+    session.add(firma)
     session.commit()
-    return furnizor
+    return firma
 
 
-def afiseaza_furnizori():
-    return session.query(Furnizor).all()
+def afiseaza_firme():
+    return session.query(Firma).all()
 
 
-def sterge_furnizor(furnizor_id):
-    furnizor = session.query(Furnizor).filter_by(id=furnizor_id).first()
-    if furnizor:
-        print(f"Am gasit furnizorul: {furnizor}")
-        session.delete(furnizor)
+def sterge_firma(firma_id):
+    firma = session.query(Firma).filter_by(id=firma_id).first()
+    if firma:
+        print(f"Am gasit firma: {firma}")
+        session.delete(firma)
         session.commit()
-        print(f"Furnizorul cu ID-ul {furnizor_id} a fost sters.")
+        print(f"Firma cu ID-ul {firma_id} a fost sters.")
     else:
-        print(f"Furnizorul cu ID-ul {furnizor_id} nu a fost gasit in baza de date.")
-
-
-def adauga_client(denumire, cif, adresa):
-    client = Client(denumire=denumire, cif=cif, adresa=adresa)
-    session.add(client)
-    session.commit()
-    return client
-
-
-def afiseaza_clienti():
-    return session.query(Client).all()
-
-
-def sterge_client(client_id):
-    client = session.query(Client).filter_by(id=client_id).first()
-    if client:
-        print(f"Am gasit clientul: {client}")
-        session.delete(client)
-        session.commit()
-        print(f"Clientul cu ID-ul {client_id} a fost sters.")
-    else:
-        print(f"Clientul cu ID-ul {client_id} nu a fost gasit in baza de date.")
+        print(f"Firma cu ID-ul {firma_id} nu a fost gasit in baza de date.")
 
 
 def adauga_produs(denumire, cantitate, pret_unitar):
@@ -194,13 +169,13 @@ def sterge_produs(produs_id):
 
 def emite_factura(furnizor_id, client_id, produse_ids):
     # verificam daca furnizorul este in baza de date
-    furnizor = session.query(Furnizor).filter_by(id=furnizor_id).first()
+    furnizor = session.query(Firma).filter_by(id=furnizor_id).first()
     if not furnizor:
         print(f"Furnizorul cu ID-ul {furnizor_id} nu a fost gasit in baza de date.")
         return None
 
     # verificam daca clientul exista in baza de date
-    client = session.query(Client).filter_by(id=client_id).first()
+    client = session.query(Firma).filter_by(id=client_id).first()
     if not client:
         print(f"Clientul cu ID-ul {client_id} nu a fost gasit in baza de date.")
         return None
@@ -302,9 +277,9 @@ while flag_program is True:
                 )
                 try:
                     if int(optiune_afisare) == 1:
-                        print(session.query(Furnizor).all())
+                        print(session.query(Firma).all())
                     elif int(optiune_afisare) == 2:
-                        print(session.query(Client).all())
+                        print(session.query(Firma).all())
                     elif int(optiune_afisare) == 3:
                         print(session.query(Produs).all())
                     elif int(optiune_afisare) == 4:
@@ -337,7 +312,10 @@ while flag_program is True:
                         furnizor = [item.strip() for item in date_furnizor.split(",")]
                         # adaugam furnizorul in baza de date
                         # furnizor = adauga_furnizor('Denumire Furnizor', 'RO123456', 'Adresa furnizor')
-                        adauga_furnizor(furnizor[0], furnizor[1], furnizor[2])
+                        if len(furnizor) != 3:
+                            print("Eroare: Nu ai introdus toate datele")
+                            break
+                        adauga_firma(furnizor[0], furnizor[1], furnizor[2])
 
                     elif int(optiune_adaugare) == 2:
                         print(
@@ -348,7 +326,7 @@ while flag_program is True:
                         client = [item.strip() for item in date_client.split(",")]
                         # adaugam clientul in baza de date
                         # furnizor = adauga_furnizor('Denumire Furnizor', 'RO123456', 'Adresa furnizor')
-                        adauga_client(client[0], client[1], client[2])
+                        adauga_firma(client[0], client[1], client[2])
 
                     elif int(optiune_adaugare) == 3:
                         print(
@@ -363,8 +341,7 @@ while flag_program is True:
 
                     elif int(optiune_adaugare) == 4:
                         try:
-                            print(session.query(Furnizor).all())
-                            print(session.query(Client).all())
+                            print(session.query(Firma).all())
                             print(session.query(Produs).all())
                             print(
                                 "Introdu datele sub forma: id furnizor, id client, produs1, produs2, ...., produs_n"
@@ -432,22 +409,22 @@ while flag_program is True:
                 try:
                     if int(optiune_stergere) == 1:
                         try:
-                            print(session.query(Furnizor).all())
+                            print(session.query(Firma).all())
                             furnizor_id = input(
                                 "Introdu id-ul furnizorului pe care vrei sa il stergi: "
                             )
-                            sterge_furnizor(int(furnizor_id))
+                            sterge_firma(int(furnizor_id))
                         except ValueError:
                             print(
                                 "Nu ai introdus o optiune valida! Introdu unul din ID-urile afisate in terminal!"
                             )
                     elif int(optiune_stergere) == 2:
                         try:
-                            print(session.query(Client).all())
+                            print(session.query(Firma).all())
                             client_id = input(
                                 "Introdu id-ul clientului pe care vrei sa il stergi: "
                             )
-                            sterge_client(int(client_id))
+                            sterge_firma(int(client_id))
                         except ValueError:
                             print(
                                 "Nu ai introdus o optiune valida! Introdu unul din ID-urile afisate in terminal!"
